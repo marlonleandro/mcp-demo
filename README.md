@@ -82,7 +82,7 @@ mcp-demo/
 - pip y npm
 - OpenAI API Key (para chatbot)
 
-### 1. Backend (API Server)
+### 1. Backend (FastAPI Server)
 
 ```bash
 cd backend
@@ -284,11 +284,23 @@ python test_mcp.py
 
 ## 🚀 Deploy en Producción
 
-### Backend con Uvicorn
+### Backend FastAPI con Uvicorn
+
+FastAPI utiliza Uvicorn como servidor ASGI para producción:
 
 ```bash
 cd backend
+
+# Producción con múltiples workers
 uvicorn api_server:app --host 0.0.0.0 --port 5000 --workers 4
+
+# Con configuración avanzada
+uvicorn api_server:app \
+  --host 0.0.0.0 \
+  --port 5000 \
+  --workers 4 \
+  --log-level info \
+  --access-log
 ```
 
 ### Frontend Build
@@ -321,23 +333,49 @@ docker-compose up -d
 
 1. **MCP NO se consume desde el frontend** en producción
 2. **Backend actúa como puente** entre frontend y MCP
-3. **stdio vs HTTP**: Cuándo usar cada protocolo
-4. **Autenticación y autorización** en arquitecturas MCP
-5. **Separación de responsabilidades** en aplicaciones empresariales
-6. **IDs secuenciales** vs UUIDs para mejor UX
-7. **Chatbot con function calling** para ejecutar herramientas MCP
-8. **Múltiples herramientas en secuencia** para flujos complejos
-9. **System prompt optimization** para mejor reconocimiento de herramientas
-10. **Microservicios independientes** (Weather Server en puerto separado)
+3. **FastAPI para APIs modernas**: Async/await, validación automática, documentación interactiva
+4. **stdio vs HTTP**: Cuándo usar cada protocolo MCP
+5. **Autenticación y autorización** en arquitecturas MCP
+6. **Separación de responsabilidades** en aplicaciones empresariales
+7. **IDs secuenciales** vs UUIDs para mejor UX
+8. **Chatbot con function calling** para ejecutar herramientas MCP
+9. **Múltiples herramientas en secuencia** para flujos complejos
+10. **System prompt optimization** para mejor reconocimiento de herramientas
+11. **Microservicios independientes** (Weather Server en puerto separado)
+12. **Pydantic para validación** de datos en tiempo real
 
 ## ⚠️ Notas Importantes
 
 - Este es un proyecto **educativo** con fines de aprendizaje
-- En producción, usar base de datos real (no memoria)
+- **FastAPI** proporciona documentación automática en `/docs` y `/redoc`
+- En producción, usar base de datos real (PostgreSQL, MongoDB) en lugar de JSON
 - Configurar Redis para rate limiting en producción
 - Usar HTTPS en todas las comunicaciones
 - Implementar refresh tokens para JWT
-- Agregar tests unitarios y de integración
+- Agregar tests unitarios y de integración con pytest
+- FastAPI soporta async/await nativo para mejor rendimiento con MCP
+
+## 🛠️ Stack Tecnológico
+
+### Backend
+- **FastAPI** - Framework web moderno y rápido con soporte async
+- **Uvicorn** - Servidor ASGI de alto rendimiento
+- **Pydantic** - Validación de datos con type hints
+- **slowapi** - Rate limiting para FastAPI
+- **python-jose** - Manejo de JWT tokens
+- **OpenAI SDK** - Integración con GPT-4
+- **MCP SDK** - Cliente y servidor Model Context Protocol
+
+### Frontend
+- **React 18** - Biblioteca UI moderna
+- **Vite** - Build tool rápido
+- **Axios** - Cliente HTTP
+- **CSS3** - Estilos personalizados
+
+### Infraestructura
+- **Docker** - Containerización
+- **Docker Compose** - Orquestación local
+- **Kubernetes** - Orquestación en producción (opcional)
 
 ## 📝 Última Actualización
 
@@ -345,9 +383,10 @@ docker-compose up -d
 **Versión**: 1.2.0
 
 **Cambios recientes**:
+- ✅ Documentación actualizada con ejemplos de FastAPI
 - ✅ Fix: Chatbot ahora reconoce correctamente consultas de clima
 - ✅ System prompt optimizado para mejor reconocimiento de herramientas
-- ✅ Documentación completa actualizada
+- ✅ Documentación completa actualizada con FastAPI
 - ✅ Guías de uso del clima agregadas
 
 ## Créditos

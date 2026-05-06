@@ -179,7 +179,7 @@ Backend → Message Queue → AI Worker → MCP Server → Resultado
          ↓                       ↓
 ┌────────────────┐      ┌────────────────┐
 │  Backend API   │      │  Backend API   │
-│  (Flask/Node)  │      │  (Flask/Node)  │
+│  (FastAPI)     │      │  (FastAPI)     │
 │                │      │                │
 │  ┌──────────┐ │      │  ┌──────────┐  │
 │  │AI Orch.  │ │      │  │AI Orch.  │  │
@@ -265,34 +265,38 @@ Backend → Message Queue → AI Worker → MCP Server → Resultado
 ### 1. Autenticación y Autorización
 
 ```python
-# Backend API (Flask)
-from flask import request
-from functools import wraps
+# Backend API (FastAPI)
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
-            return {'error': 'No token provided'}, 401
-        
-        try:
-            # Verificar JWT
-            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            request.user_id = payload['user_id']
-            request.user_role = payload['role']
-        except jwt.InvalidTokenError:
-            return {'error': 'Invalid token'}, 401
-        
-        return f(*args, **kwargs)
-    return decorated
+security = HTTPBearer()
 
-@app.route('/api/tasks', methods=['GET'])
-@require_auth
-def list_tasks():
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='No token provided'
+        )
+    
+    try:
+        # Verificar JWT
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        return {
+            'user_id': payload['user_id'],
+            'role': payload['role']
+        }
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Invalid token'
+        )
+
+@app.get('/api/tasks')
+async def list_tasks(current_user: dict = Depends(get_current_user)):
     # Solo usuarios autenticados pueden acceder
-    user_id = request.user_id
+    user_id = current_user['user_id']
     # Filtrar tareas por usuario
     ...
 ```
@@ -300,18 +304,18 @@ def list_tasks():
 ### 2. Rate Limiting
 
 ```python
-from flask_limiter import Limiter
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
-limiter = Limiter(
-    app,
-    key_func=lambda: request.headers.get('X-User-ID'),
-    default_limits=["100 per hour"]
-)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
 
-@app.route('/api/tasks', methods=['POST'])
+@app.post('/api/tasks')
 @limiter.limit("10 per minute")
-@require_auth
-def create_task():
+async def create_task(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     # Máximo 10 tareas por minuto por usuario
     ...
 ```
@@ -319,27 +323,25 @@ def create_task():
 ### 3. Validación de Entrada
 
 ```python
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator, Field
 
 class CreateTaskRequest(BaseModel):
-    title: str
+    title: str = Field(..., min_length=1, max_length=200)
     description: str
     
-    @validator('title')
-    def title_must_not_be_empty(cls, v):
+    @field_validator('title')
+    @classmethod
+    def title_must_not_be_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError('Title cannot be empty')
-        if len(v) > 200:
-            raise ValueError('Title too long')
         return v
 
-@app.route('/api/tasks', methods=['POST'])
-@require_auth
-def create_task():
-    try:
-        data = CreateTaskRequest(**request.get_json())
-    except ValidationError as e:
-        return {'error': str(e)}, 400
+@app.post('/api/tasks')
+async def create_task(
+    data: CreateTaskRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    # Validación automática por FastAPI
     ...
 ```
 
@@ -350,13 +352,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@app.route('/api/tasks', methods=['POST'])
-@require_auth
-def create_task():
-    logger.info(f"User {request.user_id} creating task", extra={
-        'user_id': request.user_id,
+@app.post('/api/tasks')
+async def create_task(
+    request: Request,
+    data: CreateTaskRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    logger.info(f"User {current_user['user_id']} creating task", extra={
+        'user_id': current_user['user_id'],
         'action': 'create_task',
-        'ip': request.remote_addr
+        'ip': request.client.host
     })
     ...
 ```
@@ -669,15 +674,24 @@ El AI Orchestration Layer es el corazón de la arquitectura backend-centric. Con
 ### Logs, Métricas, Trazas, Alertas
 
 ```python
-# Ejemplo de instrumentación
+# Ejemplo de instrumentación con FastAPI
+from fastapi import Request
+import time
+
+@app.post('/api/ai/process')
 @trace_request
 @log_execution
 @count_tokens
-async def process_ai_request(request):
-    with metrics.timer('ai_request_duration'):
-        result = await orchestration_layer.process(request)
-        metrics.increment('ai_requests_total')
-        return result
+async def process_ai_request(request: Request, data: AIRequest):
+    start_time = time.time()
+    
+    result = await orchestration_layer.process(data)
+    
+    duration = time.time() - start_time
+    metrics.observe('ai_request_duration', duration)
+    metrics.increment('ai_requests_total')
+    
+    return result
 ```
 
 ## 🔄 FLUJOS DE INTERACCIÓN DETALLADOS
@@ -747,20 +761,32 @@ async def process_ai_request(request):
 
 ```python
 # Ejemplo de middleware de autenticación
-@app.before_request
-def authenticate():
-    token = request.headers.get('Authorization')
-    user = verify_jwt(token)
+from fastapi import Request, HTTPException, status
+
+@app.middleware("http")
+async def authenticate_middleware(request: Request, call_next):
+    if request.url.path.startswith('/api/'):
+        token = request.headers.get('Authorization')
+        user = verify_jwt(token)
+        
+        # Verificar permisos para usar IA
+        if not user.has_permission('ai.use'):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='No autorizado para usar IA'
+            )
+        
+        # Verificar límites de uso
+        if user.exceeded_quota():
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail='Cuota de IA excedida'
+            )
+        
+        request.state.user = user
     
-    # Verificar permisos para usar IA
-    if not user.has_permission('ai.use'):
-        abort(403, 'No autorizado para usar IA')
-    
-    # Verificar límites de uso
-    if user.exceeded_quota():
-        abort(429, 'Cuota de IA excedida')
-    
-    request.user = user
+    response = await call_next(request)
+    return response
 ```
 
 ### 2. Rate Limiting por Usuario/Tenant
@@ -773,8 +799,12 @@ rate_limits = {
     'enterprise': '1000 per hour'
 }
 
-@limiter.limit(lambda: rate_limits[request.user.tier])
-def ai_endpoint():
+@app.post('/api/ai/chat')
+@limiter.limit(lambda request: rate_limits[request.state.user.tier])
+async def ai_endpoint(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     ...
 ```
 
@@ -782,12 +812,15 @@ def ai_endpoint():
 
 ```python
 # Validación con Pydantic
+from typing import Optional
+
 class AIRequest(BaseModel):
     prompt: str = Field(..., max_length=4000)
     context: Optional[dict] = None
     
-    @validator('prompt')
-    def validate_prompt(cls, v):
+    @field_validator('prompt')
+    @classmethod
+    def validate_prompt(cls, v: str) -> str:
         # Detectar prompt injection
         if detect_injection(v):
             raise ValueError('Prompt injection detectado')
