@@ -1169,9 +1169,3 @@ Todo pasa por el backend que actúa como:
 
 - [README.md](./README.md) - Guía principal
 - [PLANNING.md](./PLANNING.md) - Planificación y prompts
-- [LLM_USAGE.md](./LLM_USAGE.md) - Uso de LLMs
-- [GUIA_CHATBOT.md](./GUIA_CHATBOT.md) - Guía del chatbot
-- [CHATBOT_IMPLEMENTATION.md](./CHATBOT_IMPLEMENTATION.md) - Implementación técnica
-- [MIGRATION_UUID_TO_SEQUENTIAL.md](./MIGRATION_UUID_TO_SEQUENTIAL.md) - Migración de IDs
-- [CHANGELOG.md](./CHANGELOG.md) - Historial de cambios
-
