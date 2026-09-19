@@ -260,7 +260,7 @@ IMPORTANTE:
                 response = await self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    tools=self.tools,
+                    tools=self.tools, # Aquí le dices al LLM que herramientas están disponibles
                     tool_choice="auto"
                 )
                 

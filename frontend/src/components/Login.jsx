@@ -79,7 +79,7 @@ function Login({ onLogin }) {
           </form>
 
           <div style={{ marginTop: '20px', padding: '15px', background: '#f7fafc', borderRadius: '8px', fontSize: '14px', color: '#555' }}>
-            <strong>💡 Demo:</strong> Usa cualquier usuario y contraseña para acceder
+            <strong>💡 Demo:</strong> Usa cualquier usuario y una contraseña (mínimo 6 caracteres) para acceder 
           </div>
         </div>
 

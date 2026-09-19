@@ -5,6 +5,7 @@ Cliente React que consume el API Server backend (NO consume MCP directamente).
 ## 🚀 Instalación
 
 ```bash
+cd frontend
 npm install
 ```
 

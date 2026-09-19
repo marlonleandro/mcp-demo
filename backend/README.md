@@ -52,14 +52,13 @@ pip install -r requirements.txt
 Crea un archivo `.env` en el directorio `backend`:
 
 ```env
-# API Server
+# API Server Configuration
 API_HOST=0.0.0.0
 API_PORT=5000
-SECRET_KEY=your-secret-key-change-in-production
+DEBUG=false
 
-# OpenAI (para chatbot)
-OPENAI_API_KEY=sk-your-api-key-here
-OPENAI_MODEL=gpt-4
+# Security change this in production use strong random key
+SECRET_KEY=change-this-in-production-use-strong-random-key
 
 # Database
 DATABASE_URL=sqlite:///tasks.db
@@ -69,8 +68,18 @@ MCP_LOCAL_TASKS_ENABLED=true
 MCP_REMOTE_WEATHER_ENABLED=true
 MCP_REMOTE_WEATHER_URL=http://localhost:8080
 
+# Rate Limiting (use Redis in production)
+RATE_LIMIT_STORAGE=memory://
+# RATE_LIMIT_STORAGE=redis://localhost:6379
+
+# CORS (comma-separated origins)
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+
 # Logging
 LOG_LEVEL=INFO
+
+OPENAI_API_KEY=<your-openai-api-key-here>
+OPENAI_MODEL=gpt-4o
 ```
 
 ## ▶️ Ejecución
@@ -79,6 +88,7 @@ LOG_LEVEL=INFO
 
 ```bash
 # Iniciar API Server con auto-reload
+cd backend
 python api_server.py
 ```
 
